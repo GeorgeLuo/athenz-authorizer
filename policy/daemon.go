@@ -194,7 +194,7 @@ func (p *policyd) Update(ctx context.Context) error {
 // If return is nil then the request is allowed, otherwise the request is rejected.
 // Only action and resource is supporting wildcard, domain and role is not supporting wildcard.
 func (p *policyd) CheckPolicy(ctx context.Context, domain string, roles []string, action, resource string) error {
-	ech := make(chan error, len(roles))
+	ech := make(chan error, len(roles))					// ech is a buffered error channel of buffer size = the number of roles (in our case, 1)
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -223,7 +223,7 @@ func (p *policyd) CheckPolicy(ctx context.Context, domain string, roles []string
 						return				// if assertions are not found using this domainRole, then this is considered a failure
 					}
 
-					for _, ass := range asss.([]*Assertion) {
+					for _, ass := range asss.([]*Assertion) {	// now iterating through the list of assertions.......
 						glg.Debugf("Checking policy domain: %s, role: %v, action: %s, resource: %s, assertion: %v", domain, roles, action, resource, ass)
 						select {
 						case <-cctx.Done():
@@ -231,33 +231,34 @@ func (p *policyd) CheckPolicy(ctx context.Context, domain string, roles []string
 							return
 						default:
 							// deny policies come first in rolePolicies, so it will return first before allow policies is checked
-							if strings.EqualFold(ass.ResourceDomain, domain) &&
-								ass.ActionRegexp.MatchString(strings.ToLower(action)) &&
-								ass.ResourceRegexp.MatchString(strings.ToLower(resource)) {
+							if strings.EqualFold(ass.ResourceDomain, domain) &&			// string equality check https://golang.org/pkg/strings/#EqualFold
+								ass.ActionRegexp.MatchString(strings.ToLower(action)) &&	// regex match for action
+								ass.ResourceRegexp.MatchString(strings.ToLower(resource)) {	// regex match for resource
 								ch <- ass.Effect
 								return
 							}
 						}
 					}
 				}
-			}(ech)
-		}
+			}(ech)				// ech (error channel) is populated with the error(s) if the assertion has a matching domain, action, and resource to what is found in the x509 cert CN.
+							// else nil is pushed into the error channel.
+		}					
 		wg.Wait()
 	}()
 
 	allowed := false
-	for err := range ech {
+	for err := range ech {				// now we should iterate through the error channel. If a non-nil value is found in the channel, then validation failed
 		if err != nil { // denied assertion is prioritize, so return directly
 			glg.Debugf("check policy domain: %s, role: %v, action: %s, resource: %s, result: %v", domain, roles, action, resource, err)
 			return err
 		}
-		allowed = true
+		allowed = true				// allowed is set to true if there is a single nil value in error channel, and we would have returned if a non-nil value is found
 	}
-	if allowed {
+	if allowed {					// if we've made it to this point and length of ech was at least 1, then we have passed validation and return nil
 		glg.Debugf("check policy domain: %s, role: %v, action: %s, resource: %s, result: %v", domain, roles, action, resource, nil)
 		return nil
 	}
-	err := errors.Wrap(ErrNoMatch, "no match")
+	err := errors.Wrap(ErrNoMatch, "no match")	// if we reach this point, then ech was empty and then we will fail validation.
 	glg.Debugf("check policy domain: %s, role: %v, action: %s, resource: %s, result: %v", domain, roles, action, resource, err)
 	return err
 }
