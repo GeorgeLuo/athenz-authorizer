@@ -204,11 +204,12 @@ func (p *policyd) CheckPolicy(ctx context.Context, domain string, roles []string
 		wg := new(sync.WaitGroup)
 		wg.Add(len(roles))
 		rp := p.rolePolicies 						// this is a cache (map with key, value pairs). in our implementation we have an array of policies, with unique names 
-										// in our case, this array is flattened into a map to serve the same pattern.
+										// in our case, this array is flattened into a map to serve the same pattern. (policyCache)
+										// the key is the domainRole (see below)
 
 		for _, role := range roles { 					// roles here is extracted from the x509 cert passed from the client (Feeder in this case, 
 										// so there is only one role to consider)
-			dr := fmt.Sprintf("%s:role.%s", domain, role)		// dr is formed by combining the domain and role. this forms the CN essentially
+			dr := fmt.Sprintf("%s:role.%s", domain, role)		// dr is formed by combining the domain and role. this forms the CN essentially (domainRole)
 			go func(ch chan<- error) {
 				defer wg.Done()
 				select {
@@ -216,9 +217,10 @@ func (p *policyd) CheckPolicy(ctx context.Context, domain string, roles []string
 					ch <- cctx.Err()
 					return
 				default:
-					asss, ok := rp.Get(dr)
-					if !ok {
-						return
+					asss, ok := rp.Get(dr)			// now we get from the policyCache the assertions which matches the domainRole.
+										// asss is a list of assertions, the value from the KV pair found using the domainRole
+					if !ok {				
+						return				// if assertions are not found using this domainRole, then this is considered a failure
 					}
 
 					for _, ass := range asss.([]*Assertion) {
