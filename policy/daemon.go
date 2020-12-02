@@ -231,17 +231,17 @@ func (p *policyd) CheckPolicy(ctx context.Context, domain string, roles []string
 							return
 						default:
 							// deny policies come first in rolePolicies, so it will return first before allow policies is checked
-							if strings.EqualFold(ass.ResourceDomain, domain) &&			// string equality check https://golang.org/pkg/strings/#EqualFold
+							if strings.EqualFold(ass.ResourceDomain, domain) &&			// string equality check (https://golang.org/pkg/strings/#EqualFold)
 								ass.ActionRegexp.MatchString(strings.ToLower(action)) &&	// regex match for action
 								ass.ResourceRegexp.MatchString(strings.ToLower(resource)) {	// regex match for resource
-								ch <- ass.Effect
+									ch <- ass.Effect					// assertion effect (type error) is non-nil if DENY in policy file.
 								return
 							}
 						}
 					}
 				}
 			}(ech)				// ech (error channel) is populated with the error(s) if the assertion has a matching domain, action, and resource to what is found in the x509 cert CN.
-							// else nil is pushed into the error channel.
+							// else nil is pushed into the error channel, unless there was no match found at all, then error channel is length of 0.
 		}					
 		wg.Wait()
 	}()
