@@ -203,7 +203,8 @@ func (p *policyd) CheckPolicy(ctx context.Context, domain string, roles []string
 
 		wg := new(sync.WaitGroup)
 		wg.Add(len(roles))
-		rp := p.rolePolicies
+		rp := p.rolePolicies // this is a cache (map with key, value pairs). in our implementation we have an array of policies, with unique names 
+					// in our case, this array is flattened into a map to serve the same pattern.
 
 		for _, role := range roles {
 			dr := fmt.Sprintf("%s:role.%s", domain, role)
