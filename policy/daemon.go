@@ -203,11 +203,12 @@ func (p *policyd) CheckPolicy(ctx context.Context, domain string, roles []string
 
 		wg := new(sync.WaitGroup)
 		wg.Add(len(roles))
-		rp := p.rolePolicies // this is a cache (map with key, value pairs). in our implementation we have an array of policies, with unique names 
-					// in our case, this array is flattened into a map to serve the same pattern.
+		rp := p.rolePolicies 						// this is a cache (map with key, value pairs). in our implementation we have an array of policies, with unique names 
+										// in our case, this array is flattened into a map to serve the same pattern.
 
-		for _, role := range roles {
-			dr := fmt.Sprintf("%s:role.%s", domain, role)
+		for _, role := range roles { 					// roles here is extracted from the x509 cert passed from the client (Feeder in this case, 
+										// so there is only one role to consider)
+			dr := fmt.Sprintf("%s:role.%s", domain, role)		// dr is formed by combining the domain and role. this forms the CN essentially
 			go func(ch chan<- error) {
 				defer wg.Done()
 				select {
